@@ -6,23 +6,27 @@ name = "src-ash-power"
 version = "0.1.0"
 
 [dependencies]
-cortex-m = "0.6.0"
+
+# ARM cortex stuff
+cortex-m = "0.6"
 cortex-m-rt = "0.6.10"
 cortex-m-semihosting = "0.3.3"
 panic-halt = "0.2.0"
 nb = "0.1.2"
+
+# Device crates
+shared-bus = {version = "0.1.4", features = ["cortexm"]}
+ina219 = { git = "https://github.com/Atmelfan/ina219.git" }
+xca9548a = { git = "https://github.com/Atmelfan/xca9548a-rs.git" }
+ina3221 = { git = "https://github.com/Atmelfan/ina3221-rs.git" }
+
+# MISC
 scpi = "0.2.7"
 git-version = "0.3.4"
+lazy_static = {version = "1.4.0", features = ["spin_no_std"]}
 
-# Uncomment for the panic example.
-# panic-itm = "0.4.1"
-
-# Uncomment for the allocator example.
-# alloc-cortex-m = "0.3.5"
-
-# Uncomment for the device example.
-# Update `memory.x`, set target to `thumbv7em-none-eabihf` in `.cargo/config`,
-# and then use `cargo build --examples device` to build it.
+embedded-hal = "0.2.3"
+# STM32F103
 [dependencies.stm32f1xx-hal]
 version = "0.6.0"
 features = ["rt", "stm32f103", "medium"]
