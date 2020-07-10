@@ -2,7 +2,7 @@ define target remote
   target extended-remote $arg0
 
   # Enable target power
-  monitor tpwr enable
+  # monitor tpwr enable
 
   # Scan and attach to the first target
   monitor swdp_scan

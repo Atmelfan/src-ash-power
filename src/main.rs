@@ -37,7 +37,7 @@ use core::fmt::Write;
 //
 use shared_bus::BusManager;
 use ina219::{INA219, INA219_ADDR};
-use ina3221::{INA3221, INA3221_ADDR};
+use ina3221::{INA3221, INA3221_ADDR, Channel};
 use xca9548a::{SlaveAddr, Xca9543a};
 
 //Default commands
@@ -218,10 +218,10 @@ fn main() -> ! {
     //R_I2C
     let i2c_right_manager = shared_bus::BusManager::<Mutex<_>, _>::new(parts.i2c0);
     let mut r_ina219 = INA219::new(i2c_right_manager.acquire(),
-                                   0x40);
-    if let Ok(()) = r_ina219.calibrate(13421) {
+                                   0x44);
+    if let Ok(()) = r_ina219.calibrate(5369) {
         let voltage = r_ina219.voltage().unwrap();
-        let current = r_ina219.current().unwrap();
+        let current = r_ina219.current().unwrap() as f32 * 25f32/32768f32;
         writeln!(tx, "cal ok, voltage: {}, current: {}", voltage, current).unwrap();
     }
 
@@ -231,10 +231,10 @@ fn main() -> ! {
     //L_I2C
     let i2c_left_manager = shared_bus::BusManager::<Mutex<_>, _>::new(parts.i2c1);
     let mut l_ina219 = INA219::new(i2c_left_manager.acquire(),
-                                     0x40);
-    if let Ok(()) = l_ina219.calibrate(13421) {
+                                     0x44);
+    if let Ok(()) = l_ina219.calibrate(5369) {
         let voltage = l_ina219.voltage().unwrap();
-        let current = l_ina219.current().unwrap();
+        let current = l_ina219.current().unwrap() as f32 * 25f32/32768f32;
         writeln!(tx, "cal ok, voltage: {}, current: {}", voltage, current).unwrap();
     }
 
@@ -324,17 +324,23 @@ fn main() -> ! {
     let mut buffer: [u8; 100] = [0; 100];
     let mut i = 0;
 
-
-
     loop {
         // Update sensors
         if let Ok(a) = r_ina3221.read_channel(0) {
-            writeln!(tx, "cal ok, voltage: {}, current: {}", a.voltage(), a.current(0.01f32)).unwrap();
+            //writeln!(tx, "cal ok, voltage: {}, current: {}", a.voltage(), a.current(0.01f32)).unwrap();
         }
 
         if let Ok(a) = l_ina3221.read_channel(0) {
-            writeln!(tx, "cal ok, voltage: {}, current: {}", a.voltage(), a.current(0.01f32)).unwrap();
+            //writeln!(tx, "cal ok, voltage: {}, current: {}", a.voltage(), a.current(0.01f32)).unwrap();
         }
+
+        if let Ok(cur) = l_ina219.current() {
+            writeln!(tx, "l current: {}", cur as f32 * 25f32/32768f32).unwrap();
+        }
+        if let Ok(cur) = r_ina219.current() {
+            writeln!(tx, "r current: {}", cur as f32 * 25f32/32768f32).unwrap();
+        }
+
 
 
 
