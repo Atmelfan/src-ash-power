@@ -19,6 +19,7 @@ shared-bus = {version = "0.1.4", features = ["cortexm"]}
 ina219 = { git = "https://github.com/Atmelfan/ina219.git" }
 xca9548a = { git = "https://github.com/Atmelfan/xca9548a-rs.git" }
 ina3221 = { git = "https://github.com/Atmelfan/ina3221-rs.git" }
+stusb4500 = { git = "https://github.com/Atmelfan/stusb4500-rs" }
 
 # MISC
 scpi = "0.2.7"
@@ -31,16 +32,20 @@ embedded-hal = "0.2.3"
 version = "0.6.0"
 features = ["rt", "stm32f103", "medium"]
 
-
-
 # this lets you use `cargo fix`!
 [[bin]]
 name = "src-ash-power"
 test = false
 bench = false
 
+[profile.dev]
+codegen-units = 1 # better optimizations
+opt-level = 's'  # Optimize for size.
+debug = true # symbols are nice and they don't increase the size on Flash
+lto = true # better optimizations
+
 [profile.release]
 codegen-units = 1 # better optimizations
-opt-level = 'z'  # Optimize for size.
+opt-level = 's'  # Optimize for size.
 debug = true # symbols are nice and they don't increase the size on Flash
 lto = true # better optimizations

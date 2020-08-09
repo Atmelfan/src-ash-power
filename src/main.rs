@@ -14,6 +14,7 @@ use cortex_m::interrupt::Mutex;
 
 use cortex_m_rt::entry;
 use stm32f1xx_hal::stm32::{
+    I2C1,
     I2C2,
     interrupt
 };
@@ -38,6 +39,7 @@ use core::fmt::Write;
 use shared_bus::BusManager;
 use ina219::{INA219, INA219_ADDR};
 use ina3221::{INA3221, INA3221_ADDR, Channel};
+use stusb4500::{STUSB4500, Address, PdoChannel, registers::AlertMask};
 use xca9548a::{SlaveAddr, Xca9543a};
 
 //Default commands
@@ -69,6 +71,10 @@ use core::str;
 use git_version::git_version;
 use stm32f1xx_hal::qei::SlaveMode::ResetMode;
 use stm32f1xx_hal::gpio::State;
+
+use cortex_m_semihosting::hprintln;
+use stusb4500::pdo::Pdo;
+use stm32f1xx_hal::afio::MAPR;
 
 const GIT_VERSION: &[u8] = git_version!().as_bytes();
 
@@ -163,6 +169,9 @@ fn main() -> ! {
 
     let mut gpioa = p.GPIOA.split(&mut rcc.apb2);
     let mut gpiob = p.GPIOB.split(&mut rcc.apb2);
+    let mut gpioc = p.GPIOC.split(&mut rcc.apb2);
+
+    let mut debug_led = gpioc.pc15.into_push_pull_output(&mut gpioc.crh);
 
     // *** USART1
     let tx = gpioa.pa9.into_alternate_push_pull(&mut gpioa.crh);
@@ -185,12 +194,27 @@ fn main() -> ! {
     if let Err(_) = i2c_rst.set_high() {
         writeln!(tx, "err").unwrap();
     }
-    let sda = gpiob.pb11.into_alternate_open_drain(&mut gpiob.crh);
-    let scl = gpiob.pb10.into_alternate_open_drain(&mut gpiob.crh);
 
+    let sda_i2c2 = gpiob.pb11.into_alternate_open_drain(&mut gpiob.crh);
+    let scl_i2c2 = gpiob.pb10.into_alternate_open_drain(&mut gpiob.crh);
     let i2c_bus = BlockingI2c::i2c2(
         p.I2C2,
-        (scl,sda),
+        (scl_i2c2, sda_i2c2),
+        Mode::standard(100.khz()),
+        clocks,
+        &mut rcc.apb1,
+        1000,
+        1,
+        1000,
+        1000
+    );
+
+    let sda_i2c1 = gpiob.pb9.into_alternate_open_drain(&mut gpiob.crh);
+    let scl_i2c1 = gpiob.pb8.into_alternate_open_drain(&mut gpiob.crh);
+    let i2c_bus = BlockingI2c::i2c1(
+        p.I2C1,
+        (scl_i2c1, sda_i2c1),
+        &mut afio.mapr,
         Mode::standard(100.khz()),
         clocks,
         &mut rcc.apb1,
@@ -202,46 +226,30 @@ fn main() -> ! {
 
     //I2C_POWER
     let i2c_pwr_manager = shared_bus::BusManager::<Mutex<_>, _>::new(i2c_bus);
-
-    //let mut aux_ina219 = INA219::new(i2c_pwr_manager.acquire(),
-    //                                 0x45);
-    //if let Ok(()) = aux_ina219.calibrate(13421) {
-    //    let voltage = aux_ina219.voltage().unwrap();
-    //    let current = aux_ina219.current().unwrap();
-    //    writeln!(tx, "cal ok, voltage: {}, current: {}", voltage, current).unwrap();
-    //}
+    let mut stusb4500 = STUSB4500::new(i2c_pwr_manager.acquire(), Address::Default);
 
     let pca9543a = Xca9543a::new(i2c_pwr_manager.acquire(),
                                      SlaveAddr::Alternative(false, false, false));
     let parts = pca9543a.split();
 
-    //R_I2C
+    //I2C_R
     let i2c_right_manager = shared_bus::BusManager::<Mutex<_>, _>::new(parts.i2c0);
-    let mut r_ina219 = INA219::new(i2c_right_manager.acquire(),
-                                   0x44);
-    if let Ok(()) = r_ina219.calibrate(5369) {
-        let voltage = r_ina219.voltage().unwrap();
-        let current = r_ina219.current().unwrap() as f32 * 25f32/32768f32;
-        writeln!(tx, "cal ok, voltage: {}, current: {}", voltage, current).unwrap();
-    }
 
-    let mut r_ina3221 = INA3221::new(i2c_right_manager.acquire(),
-                                     0x40);
+    let mut r_ina219 = INA219::new(i2c_right_manager.acquire(), 0x44);
+    r_ina219.calibrate(5369).expect("Failed to calibrate r_ina219");
 
-    //L_I2C
+    let mut r_ina3221 = INA3221::new(i2c_right_manager.acquire(), 0x40);
+
+    //I2C_L
     let i2c_left_manager = shared_bus::BusManager::<Mutex<_>, _>::new(parts.i2c1);
-    let mut l_ina219 = INA219::new(i2c_left_manager.acquire(),
-                                     0x44);
-    if let Ok(()) = l_ina219.calibrate(5369) {
-        let voltage = l_ina219.voltage().unwrap();
-        let current = l_ina219.current().unwrap() as f32 * 25f32/32768f32;
-        writeln!(tx, "cal ok, voltage: {}, current: {}", voltage, current).unwrap();
-    }
 
-    let mut l_ina3221 = INA3221::new(i2c_left_manager.acquire(),
-                                     0x40);
+    let mut l_ina219 = INA219::new(i2c_left_manager.acquire(), 0x44);
+    l_ina219.calibrate(5369).expect("Failed to calibrate l_ina219");
+
+    let mut l_ina3221 = INA3221::new(i2c_left_manager.acquire(), 0x40);
 
 
+    // SCPI
     let mut my_device = MyDevice { };
 
     let mut tree = Node {name: b"ROOT", optional: true, handler: None, sub: Some(&[
@@ -321,11 +329,26 @@ fn main() -> ! {
 
     let mut context = Context::new(&mut my_device, &mut errors, &mut tree);
 
-    let mut buffer: [u8; 100] = [0; 100];
-    let mut i = 0;
+    // Reconfigure the USB-PD controller and remove 20V profile
+    let pdo2 = Pdo::new_fixed(12000, 2000);
+    let pdo3 = Pdo::new_fixed(15000, 2000);
+    if let Ok(()) = stusb4500.clear_interrupts()
+        .and_then(|_| stusb4500.set_alerts_mask(AlertMask::default()))
+        .and_then(|_| stusb4500.set_pdo(PdoChannel::PDO2, &pdo2))
+        .and_then(|_| stusb4500.set_pdo(PdoChannel::PDO3, &pdo3))
+        .and_then(|_| stusb4500.soft_reset()) {
+
+    }else{
+        errors.push_back_error(Error::DeviceSpecificError);
+    }
 
     loop {
+        hprintln!(">>!").unwrap();
         // Update sensors
+        if let Ok(rdo) = stusb4500.get_current_rdo() {
+            writeln!(tx, "rdo, current: {}", rdo.max_operating_current()).unwrap();
+            hprintln!("rdo, current: {}", rdo.max_operating_current()).unwrap();
+        }
         if let Ok(a) = r_ina3221.read_channel(0) {
             //writeln!(tx, "cal ok, voltage: {}, current: {}", a.voltage(), a.current(0.01f32)).unwrap();
         }
@@ -341,9 +364,6 @@ fn main() -> ! {
             writeln!(tx, "r current: {}", cur as f32 * 25f32/32768f32).unwrap();
         }
 
-
-
-
-
+        debug_led.toggle().unwrap();
     }
 }

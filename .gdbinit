@@ -8,6 +8,9 @@ define target remote
   monitor swdp_scan
   attach 1
 
+  #
+  load
+
   # print demangled symbols
   set print asm-demangle on
 

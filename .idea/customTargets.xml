@@ -4,7 +4,7 @@
     <target id="2729286d-464d-4ada-b00f-f8730691a13f" name="Unnamed" projectName="src-ash-power">
       <configuration id="3fd4554f-699e-4ecc-bce5-eead0848ff0f" name="Unnamed">
         <build type="TOOL">
-          <tool actionId="Tool_External Tools_Dummy" />
+          <tool actionId="Tool_External Tools_Cargo" />
         </build>
       </configuration>
     </target>
