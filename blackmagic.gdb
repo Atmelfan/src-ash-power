@@ -1,5 +1,5 @@
 # Assumes that you have udev rules set up for black magic probe
-# target extended-remote /dev/ttyBmpGdb
+target extended-remote /dev/ttyBmpGdb
 
 # Enable target power
 # monitor tpwr enable

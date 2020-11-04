@@ -197,7 +197,7 @@ fn main() -> ! {
 
     let sda_i2c2 = gpiob.pb11.into_alternate_open_drain(&mut gpiob.crh);
     let scl_i2c2 = gpiob.pb10.into_alternate_open_drain(&mut gpiob.crh);
-    let i2c_bus = BlockingI2c::i2c2(
+    let i2c_bus2 = BlockingI2c::i2c2(
         p.I2C2,
         (scl_i2c2, sda_i2c2),
         Mode::standard(100.khz()),
@@ -211,7 +211,7 @@ fn main() -> ! {
 
     let sda_i2c1 = gpiob.pb9.into_alternate_open_drain(&mut gpiob.crh);
     let scl_i2c1 = gpiob.pb8.into_alternate_open_drain(&mut gpiob.crh);
-    let i2c_bus = BlockingI2c::i2c1(
+    let i2c_bus1 = BlockingI2c::i2c1(
         p.I2C1,
         (scl_i2c1, sda_i2c1),
         &mut afio.mapr,
@@ -225,7 +225,7 @@ fn main() -> ! {
     );
 
     //I2C_POWER
-    let i2c_pwr_manager = shared_bus::BusManager::<Mutex<_>, _>::new(i2c_bus);
+    let i2c_pwr_manager = shared_bus::BusManager::<Mutex<_>, _>::new(i2c_bus2);
     let mut stusb4500 = STUSB4500::new(i2c_pwr_manager.acquire(), Address::Default);
 
     let pca9543a = Xca9543a::new(i2c_pwr_manager.acquire(),
